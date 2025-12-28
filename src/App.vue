@@ -166,7 +166,7 @@ const formatMoney = (cents: number) => {
           v-for="cat in ['breakfast', 'lunch', 'sides', 'beverages', 'temps']"
           :key="cat"
           @click="activeCategory = cat as any"
-          class="py-3 text-sm font-black tracking-wider uppercase transition-all duration-150 rounded-sm min-w-30"
+          class="font-black tracking-wider uppercase transition-all duration-150 rounded-sm  min-w-30"
           :class="
             activeCategory === cat
               ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]'
