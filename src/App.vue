@@ -1,35 +1,35 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { menuDatabase } from "./data/menu";
-import { MenuItem, TicketItem } from "./types";
+import type { MenuItem, TicketItem } from "./types";
 
 // --- THE LOGIC ---
 
-// 1. STATE: The Ticket (The bill)
+// 1. STATE: The Ticket
 const ticket = ref<TicketItem[]>([]);
 
 // 2. STATE: The Active Tab (Default to Breakfast)
-const activeCategory = ref<"breakfast" | "lunch" | "sides" | "beverages">(
-  "breakfast"
-);
+const activeCategory = ref<
+  "breakfast" | "lunch" | "sides" | "beverages" | "temps"
+>("breakfast");
 
-// 3. COMPUTED: Filter the menu based on the active tab
+// 3. COMPUTED: Filter menu
 const filteredMenu = computed(() => {
   return menuDatabase.filter((item) => item.category === activeCategory.value);
 });
 
-// 4. ACTION: Add an item to the ticket
+// 4. ACTION: Add Item
 const addItem = (item: MenuItem) => {
-  // SCATTER LOGIC: If it's a modifier, add it to the LAST item
   if (item.isModifier) {
     if (ticket.value.length > 0) {
       const lastItem = ticket.value[ticket.value.length - 1];
-      lastItem.modifiers.push(item);
+      if (lastItem) {
+        lastItem.modifiers.push(item);
+      }
     }
     return;
   }
 
-  // NORMAL ITEM: Create a new row
   const newItem: TicketItem = {
     ...item,
     uuid: crypto.randomUUID(),
@@ -38,12 +38,12 @@ const addItem = (item: MenuItem) => {
   ticket.value.push(newItem);
 };
 
-// 5. ACTION: Remove an item
+// 5. ACTION: Remove Item
 const removeItem = (uuid: string) => {
   ticket.value = ticket.value.filter((item) => item.uuid !== uuid);
 };
 
-// 6. MATH: Calculate Grand Total
+// 6. MATH: Totals
 const grandTotal = computed(() => {
   return ticket.value.reduce((total, item) => {
     const modsCost = item.modifiers.reduce((sum, mod) => sum + mod.price, 0);
@@ -51,7 +51,7 @@ const grandTotal = computed(() => {
   }, 0);
 });
 
-// 7. HELPER: Format Money
+// 7. HELPER: Money Format
 const formatMoney = (cents: number) => {
   return (cents / 100).toLocaleString("en-US", {
     style: "currency",
@@ -61,135 +61,141 @@ const formatMoney = (cents: number) => {
 </script>
 
 <template>
-  <div class="flex h-screen w-full bg-gray-100 overflow-hidden font-sans">
-    <div
-      class="w-1/3 bg-white flex flex-col shadow-2xl z-20 border-r border-gray-300"
-    >
+  <div class="flex h-screen w-full bg-zinc-900 overflow-hidden font-sans">
+    <div class="w-1/3 bg-white flex flex-col shadow-2xl z-20 relative">
       <div
-        class="p-4 bg-gray-900 text-yellow-400 text-center font-black text-xl uppercase tracking-widest"
+        class="absolute -bottom-2 w-full h-4 bg-transparent bg-size-[20px_20px] bg-repeat-x"
+        style="
+          background-image: radial-gradient(circle, transparent 50%, white 55%);
+        "
+      ></div>
+
+      <div
+        class="p-6 bg-black text-yellow-400 text-center border-b-4 border-yellow-400"
       >
-        Waffle Calc
+        <h1
+          class="font-black text-3xl tracking-widest uppercase"
+          style="text-shadow: 2px 2px 0px #333"
+        >
+          WAFFLE HOUSE
+        </h1>
+        <p class="text-xs text-zinc-400 mt-1 uppercase tracking-widest">
+          Guest Check #{{ Math.floor(Math.random() * 9000) + 1000 }}
+        </p>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-4">
-        <div
-          v-if="ticket.length === 0"
-          class="text-center text-gray-400 mt-10 italic"
-        >
-          Ticket is empty...
-        </div>
-
-        <ul class="space-y-4">
+      <div class="flex-1 overflow-y-auto p-2 bg-zinc-50">
+        <ul class="space-y-1">
           <li
             v-for="item in ticket"
             :key="item.uuid"
-            class="border-b border-gray-100 pb-2"
+            class="bg-white p-3 border border-zinc-200 shadow-sm relative group"
           >
-            <div
-              class="flex justify-between items-center font-bold text-gray-900 text-lg"
-            >
-              <span>{{ item.name }}</span>
-              <span>{{ formatMoney(item.price) }}</span>
+            <div class="flex justify-between items-baseline">
+              <span class="font-black text-zinc-900 text-lg uppercase">{{
+                item.name
+              }}</span>
+              <span class="font-mono font-bold text-zinc-700">{{
+                formatMoney(item.price)
+              }}</span>
             </div>
 
-            <div v-if="item.modifiers.length > 0" class="pl-4 mt-1 space-y-1">
+            <div
+              v-if="item.modifiers.length > 0"
+              class="mt-1 ml-4 border-l-2 border-zinc-300 pl-2"
+            >
               <div
                 v-for="(mod, index) in item.modifiers"
                 :key="index"
-                class="flex justify-between text-sm text-gray-600"
+                class="flex justify-between text-sm text-zinc-500 font-medium"
               >
                 <span>+ {{ mod.name }}</span>
-                <span>{{ formatMoney(mod.price) }}</span>
+                <span v-if="mod.price > 0" class="font-mono">{{
+                  formatMoney(mod.price)
+                }}</span>
               </div>
             </div>
 
             <button
               @click="removeItem(item.uuid)"
-              class="text-xs text-red-500 mt-2 hover:text-red-700 font-semibold uppercase"
+              class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md text-xs font-bold"
             >
-              [ Remove ]
+              X
             </button>
           </li>
         </ul>
+
+        <div
+          v-if="ticket.length === 0"
+          class="flex flex-col items-center justify-center h-64 text-zinc-300"
+        >
+          <span class="text-6xl opacity-20 font-black">WH</span>
+          <span class="mt-2 text-sm uppercase font-bold tracking-widest"
+            >Ready for Order</span
+          >
+        </div>
       </div>
 
-      <div class="p-6 bg-yellow-400 text-black border-t-4 border-black">
-        <div class="flex justify-between items-center text-4xl font-black">
+      <div class="p-6 bg-zinc-100 border-t-2 border-zinc-300">
+        <div class="flex justify-between items-center">
+          <span class="text-zinc-500 font-bold uppercase tracking-wider text-sm"
+            >Tax (Included)</span
+          >
+          <span class="font-mono text-zinc-400 text-sm">$0.00</span>
+        </div>
+        <div
+          class="flex justify-between items-center mt-2 pt-4 border-t border-zinc-300 text-4xl font-black text-zinc-900"
+        >
           <span>TOTAL</span>
           <span>{{ formatMoney(grandTotal) }}</span>
         </div>
       </div>
     </div>
 
-    <div class="w-2/3 bg-gray-200 flex flex-col h-full">
-      <div class="flex bg-white shadow-md z-10">
+    <div class="w-2/3 flex flex-col h-full bg-zinc-200">
+      <div class="flex bg-black p-1 space-x-1 overflow-x-auto shadow-md">
         <button
-          @click="activeCategory = 'breakfast'"
-          class="flex-1 py-4 font-black uppercase tracking-wider border-b-4 transition-colors"
+          v-for="cat in ['breakfast', 'lunch', 'sides', 'beverages', 'temps']"
+          :key="cat"
+          @click="activeCategory = cat as any"
+          class="flex-1 py-4 font-black uppercase tracking-wider text-sm transition-all duration-150 rounded-sm"
           :class="
-            activeCategory === 'breakfast'
-              ? 'border-yellow-400 bg-yellow-50 text-black'
-              : 'border-transparent text-gray-400 hover:bg-gray-50'
+            activeCategory === cat
+              ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
           "
         >
-          Breakfast
-        </button>
-        <button
-          @click="activeCategory = 'lunch'"
-          class="flex-1 py-4 font-black uppercase tracking-wider border-b-4 transition-colors"
-          :class="
-            activeCategory === 'lunch'
-              ? 'border-red-600 bg-red-50 text-black'
-              : 'border-transparent text-gray-400 hover:bg-gray-50'
-          "
-        >
-          Lunch
-        </button>
-        <button
-          @click="activeCategory = 'sides'"
-          class="flex-1 py-4 font-black uppercase tracking-wider border-b-4 transition-colors"
-          :class="
-            activeCategory === 'sides'
-              ? 'border-amber-800 bg-amber-50 text-black'
-              : 'border-transparent text-gray-400 hover:bg-gray-50'
-          "
-        >
-          Sides
-        </button>
-        <button
-          @click="activeCategory = 'beverages'"
-          class="flex-1 py-4 font-black uppercase tracking-wider border-b-4 transition-colors"
-          :class="
-            activeCategory === 'beverages'
-              ? 'border-blue-500 bg-blue-50 text-black'
-              : 'border-transparent text-gray-400 hover:bg-gray-50'
-          "
-        >
-          Drinks
+          {{ cat }}
         </button>
       </div>
 
-      <div class="p-4 overflow-y-auto flex-1">
-        <div class="grid grid-cols-3 gap-4">
+      <div class="p-4 overflow-y-auto flex-1 bg-zinc-200">
+        <div class="grid grid-cols-3 xl:grid-cols-4 gap-3">
           <button
             v-for="item in filteredMenu"
             :key="item.id"
             @click="addItem(item)"
-            class="h-32 rounded-xl shadow-md flex flex-col items-center justify-center p-2 transition-transform active:scale-95 border-b-4 border-black/10 text-white"
-            :class="{
-              'bg-yellow-400 hover:bg-yellow-300 text-black':
-                item.category === 'breakfast',
-              'bg-red-600 hover:bg-red-500': item.category === 'lunch',
-              'bg-amber-800 hover:bg-amber-700': item.category === 'sides',
-              'bg-blue-500 hover:bg-blue-400': item.category === 'beverages',
-            }"
+            class="h-28 bg-white border-2 border-zinc-300 rounded-lg shadow-sm flex flex-col items-center justify-center p-3 transition-all active:scale-95 active:bg-yellow-400 active:border-black active:text-black group hover:border-zinc-400 hover:shadow-md"
           >
-            <span class="text-xl font-bold text-center leading-tight">{{
-              item.name
-            }}</span>
-            <span class="mt-1 text-sm opacity-80 font-mono">{{
-              formatMoney(item.price)
-            }}</span>
+            <span
+              class="text-lg font-black text-center leading-tight text-zinc-800 group-active:text-black"
+            >
+              {{ item.name }}
+            </span>
+
+            <span
+              v-if="item.price > 0"
+              class="mt-2 text-xs font-bold bg-zinc-100 text-zinc-500 px-2 py-1 rounded group-active:bg-black/10 group-active:text-black"
+            >
+              {{ formatMoney(item.price) }}
+            </span>
+
+            <span
+              v-else
+              class="mt-2 text-[10px] font-black uppercase text-zinc-300 tracking-widest group-active:text-black/50"
+            >
+              MOD
+            </span>
           </button>
         </div>
       </div>
