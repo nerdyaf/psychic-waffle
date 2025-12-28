@@ -1,76 +1,57 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { menuDatabase } from "./data/menu";
-import type { MenuItem, TicketItem } from "./types";
+import { MenuItem, TicketItem } from "./types";
 
 // --- THE LOGIC ---
 
-// 1. STATE: The current ticket starts empty
+// 1. STATE: The Ticket (The bill)
 const ticket = ref<TicketItem[]>([]);
-const selectedItemUuid = ref<string | null>(null);
 
-// ACTION: Select an item on the ticket to modify it
-const selectItem = (uuid: string) => {
-  // If clicking the same item, deselect it. Otherwise, select the new one.
-  selectedItemUuid.value = selectedItemUuid.value === uuid ? null : uuid;
-};
+// 2. STATE: The Active Tab (Default to Breakfast)
+const activeCategory = ref<"breakfast" | "lunch" | "sides" | "beverages">(
+  "breakfast"
+);
 
-// 2. ACTION: Add an item to the ticket
+// 3. COMPUTED: Filter the menu based on the active tab
+const filteredMenu = computed(() => {
+  return menuDatabase.filter((item) => item.category === activeCategory.value);
+});
+
+// 4. ACTION: Add an item to the ticket
 const addItem = (item: MenuItem) => {
-  // MODIFIER LOGIC: Add to the SELECTED item, or fall back to the LAST item.
+  // SCATTER LOGIC: If it's a modifier, add it to the LAST item
   if (item.isModifier) {
-    let itemToModify: TicketItem | undefined;
-
-    // 1. Try to find the currently selected item.
-    if (selectedItemUuid.value) {
-      itemToModify = ticket.value.find(
-        (t) => t.uuid === selectedItemUuid.value
-      );
+    if (ticket.value.length > 0) {
+      const lastItem = ticket.value[ticket.value.length - 1];
+      lastItem.modifiers.push(item);
     }
-
-    // 2. If no item is selected (or was not found), fall back to the last item on the ticket.
-    if (!itemToModify && ticket.value.length > 0) {
-      itemToModify = ticket.value[ticket.value.length - 1];
-    }
-
-    // 3. If we have an item to modify, add the modifier.
-    if (itemToModify) {
-      itemToModify.modifiers.push(item);
-    }
-
-    return; // Stop here. Do not create a new row.
+    return;
   }
 
-  // NORMAL ITEM: Create a new row on the ticket
+  // NORMAL ITEM: Create a new row
   const newItem: TicketItem = {
     ...item,
     uuid: crypto.randomUUID(),
     modifiers: [],
   };
   ticket.value.push(newItem);
-  selectedItemUuid.value = newItem.uuid; // Auto-select the new item
 };
 
-// 3. ACTION: Remove an item from the ticket
+// 5. ACTION: Remove an item
 const removeItem = (uuid: string) => {
   ticket.value = ticket.value.filter((item) => item.uuid !== uuid);
-  // If the removed item was selected, clear the selection
-  if (selectedItemUuid.value === uuid) {
-    selectedItemUuid.value = null;
-  }
 };
 
-// 4. MATH: Calculate the Grand Total automatically
+// 6. MATH: Calculate Grand Total
 const grandTotal = computed(() => {
   return ticket.value.reduce((total, item) => {
-    // Add up the modifiers for this specific item
     const modsCost = item.modifiers.reduce((sum, mod) => sum + mod.price, 0);
-    // Add Item Price + Modifiers Price to the total
     return total + item.price + modsCost;
   }, 0);
 });
 
-// 5. HELPER: Make it look like money ($10.50)
+// 7. HELPER: Format Money
 const formatMoney = (cents: number) => {
   return (cents / 100).toLocaleString("en-US", {
     style: "currency",
@@ -82,7 +63,7 @@ const formatMoney = (cents: number) => {
 <template>
   <div class="flex h-screen w-full bg-gray-100 overflow-hidden font-sans">
     <div
-      class="w-1/3 bg-white flex flex-col shadow-2xl z-10 border-r border-gray-300"
+      class="w-1/3 bg-white flex flex-col shadow-2xl z-20 border-r border-gray-300"
     >
       <div
         class="p-4 bg-gray-900 text-yellow-400 text-center font-black text-xl uppercase tracking-widest"
@@ -102,13 +83,7 @@ const formatMoney = (cents: number) => {
           <li
             v-for="item in ticket"
             :key="item.uuid"
-            @click="selectItem(item.uuid)"
-            class="p-2 rounded-lg cursor-pointer transition-all border-b border-gray-200"
-            :class="{
-              'bg-yellow-100 ring-2 ring-yellow-400':
-                selectedItemUuid === item.uuid,
-              'hover:bg-gray-50': selectedItemUuid !== item.uuid,
-            }"
+            class="border-b border-gray-100 pb-2"
           >
             <div
               class="flex justify-between items-center font-bold text-gray-900 text-lg"
@@ -129,7 +104,7 @@ const formatMoney = (cents: number) => {
             </div>
 
             <button
-              @click.stop="removeItem(item.uuid)"
+              @click="removeItem(item.uuid)"
               class="text-xs text-red-500 mt-2 hover:text-red-700 font-semibold uppercase"
             >
               [ Remove ]
@@ -146,26 +121,77 @@ const formatMoney = (cents: number) => {
       </div>
     </div>
 
-    <div class="w-2/3 bg-gray-200 p-4 overflow-y-auto">
-      <h2 class="text-2xl font-bold mb-4 text-gray-700">Menu</h2>
-
-      <div class="grid grid-cols-3 gap-4">
+    <div class="w-2/3 bg-gray-200 flex flex-col h-full">
+      <div class="flex bg-white shadow-md z-10">
         <button
-          v-for="item in menuDatabase"
-          :key="item.id"
-          @click="addItem(item)"
-          class="h-32 rounded-xl shadow-md flex flex-col items-center justify-center p-2 transition-transform active:scale-95 border-b-4 border-black/10"
-          :class="{
-            'bg-yellow-400 hover:bg-yellow-300 text-black':
-              item.category === 'breakfast',
-            'bg-red-600 hover:bg-red-500 text-white': item.category === 'lunch',
-            'bg-amber-800 hover:bg-amber-700 text-white':
-              item.category === 'sides',
-          }"
+          @click="activeCategory = 'breakfast'"
+          class="flex-1 py-4 font-black uppercase tracking-wider border-b-4 transition-colors"
+          :class="
+            activeCategory === 'breakfast'
+              ? 'border-yellow-400 bg-yellow-50 text-black'
+              : 'border-transparent text-gray-400 hover:bg-gray-50'
+          "
         >
-          <span class="font-bold text-center">{{ item.name }}</span>
-          <span class="text-sm">{{ formatMoney(item.price) }}</span>
+          Breakfast
         </button>
+        <button
+          @click="activeCategory = 'lunch'"
+          class="flex-1 py-4 font-black uppercase tracking-wider border-b-4 transition-colors"
+          :class="
+            activeCategory === 'lunch'
+              ? 'border-red-600 bg-red-50 text-black'
+              : 'border-transparent text-gray-400 hover:bg-gray-50'
+          "
+        >
+          Lunch
+        </button>
+        <button
+          @click="activeCategory = 'sides'"
+          class="flex-1 py-4 font-black uppercase tracking-wider border-b-4 transition-colors"
+          :class="
+            activeCategory === 'sides'
+              ? 'border-amber-800 bg-amber-50 text-black'
+              : 'border-transparent text-gray-400 hover:bg-gray-50'
+          "
+        >
+          Sides
+        </button>
+        <button
+          @click="activeCategory = 'beverages'"
+          class="flex-1 py-4 font-black uppercase tracking-wider border-b-4 transition-colors"
+          :class="
+            activeCategory === 'beverages'
+              ? 'border-blue-500 bg-blue-50 text-black'
+              : 'border-transparent text-gray-400 hover:bg-gray-50'
+          "
+        >
+          Drinks
+        </button>
+      </div>
+
+      <div class="p-4 overflow-y-auto flex-1">
+        <div class="grid grid-cols-3 gap-4">
+          <button
+            v-for="item in filteredMenu"
+            :key="item.id"
+            @click="addItem(item)"
+            class="h-32 rounded-xl shadow-md flex flex-col items-center justify-center p-2 transition-transform active:scale-95 border-b-4 border-black/10 text-white"
+            :class="{
+              'bg-yellow-400 hover:bg-yellow-300 text-black':
+                item.category === 'breakfast',
+              'bg-red-600 hover:bg-red-500': item.category === 'lunch',
+              'bg-amber-800 hover:bg-amber-700': item.category === 'sides',
+              'bg-blue-500 hover:bg-blue-400': item.category === 'beverages',
+            }"
+          >
+            <span class="text-xl font-bold text-center leading-tight">{{
+              item.name
+            }}</span>
+            <span class="mt-1 text-sm opacity-80 font-mono">{{
+              formatMoney(item.price)
+            }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
